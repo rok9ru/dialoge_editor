@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>jQuery UI Draggable - Auto-scroll</title>
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+
+    <!--<link rel="stylesheet" href="jquery.line-master/example/default_css.css">-->
+    <style>
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        table {
+            font-size: 1em;
+        }
+
+        .ui-draggable, .ui-droppable {
+            background-position: top;
+        }
+
+        .drag_elem {
+            min-width: 150px;
+            min-height: 150px;
+            height: 150px;
+            display: inline-block;
+            padding: 0.5em;
+            float: left;
+            margin: 0 10px 10px 0;
+            overflow: hidden;
+        }
+
+        .left_t_e, .right_t_e {
+            height: 100%;
+        }
+
+
+        /*   .ui-resizable {
+			   position: absolute;
+		   }
+   */
+    </style>
+    <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script type="text/javascript" src="jquery.line-master/jquery.line.js"></script>
+
+    <script>
+        $(function () {
+
+            var json = {
+                elements: [
+                    {
+                        id: 1,
+                        type: 'messsage',
+                        text: 'Text test test 1',
+                        next: 2,
+                    },
+                    {
+                        id: 2,
+                        type: 'messsage',
+                        text: 'Text test test 1',
+                        next: [3, 4]
+                    },
+                    {
+                        id: 3,
+                        type: 'answer',
+                        text: 'Answer 1',
+                    },
+                    {
+                        id: 4,
+                        type: 'answer',
+                        text: 'Answer 2',
+                    }
+                ],
+            };
+
+
+            var area = $('#edit_area');
+
+
+            var newButton = $('#add_element');
+
+
+            var Drover = function (area, id) {
+                var lastX = 0;
+                var lastY = 0;
+
+                var lineContainer;
+
+                var createContainer = function () {
+                    if (!lineContainer) {
+                        lineContainer = $('<div id="' + (id || '') + '"></div>').appendTo(area);
+                    }
+                    return lineContainer;
+                };
+
+                return {
+                    start(x, y) {
+                        lastX = x;
+                        lastY = y;
+                        return this;
+                    },
+                    reset(x, y) {
+                        if (lineContainer) {
+                            lineContainer.remove();
+                            lineContainer = null;
+                        }
+                        lastX = x || 0;
+                        lastY = y || 0;
+                        return this;
+                    },
+                    shift: function (shiftX, shiftY) {
+                        createContainer();
+
+                        $('<div></div>').line(
+                            lastX,
+                            lastY,
+                            lastX = lastX + (shiftX || 0),
+                            lastY = lastY + (shiftY || 0),
+                            {}
+                        ).appendTo(lineContainer);
+                        return this;
+
+                    },
+                    to: function (x, y) {
+                        createContainer();
+
+                        $('<div></div>').line(
+                            lastX,
+                            lastY,
+                            lastX = x || lastX,
+                            lastY = y || lastY,
+                            {}
+                        ).appendTo(lineContainer);
+                        return this;
+                    },
+                    getLine: createContainer,
+                };
+            };
+
+
+            var setPointer = function (pointer) {
+                area.css({cursor: pointer});
+            };
+
+
+            var StorageHolder = function (area, json) {
+
+
+                var maxElemId = 0;
+                var lineMaxId = 0;
+
+                var content = json || {};
+                var lines = [];
+                content.elements = content.elements || [];
+
+                //try to detect max ID
+                $.each(content.elements, function (key, value) {
+                    if (value.id && value.id > maxElemId) {
+                        maxElemId = value.id;
+                    }
+                });
+
+
+                var updateById = function (id, data) {
+                    for (var i = 0; i < content.elements.length; i++) {
+                        if (content.elements[i].id == id) {
+                            content.elements[i] = $.extend({}, content.elements[i], data);
+                        }
+                    }
+                };
+
+
+                var getById = function (id) {
+                    for (var i = 0; i < content.elements.length; i++) {
+                        if (content.elements[i].id == id) {
+                            return content.elements[i];
+                        }
+                    }
+                };
+
+                var addElemChild = function (id, childId) {
+                    for (var i = 0; i < content.elements.length; i++) {
+                        if (content.elements[i].id == id) {
+
+                            if (content.elements[i].next) {
+                                if (content.elements[i].next.indexOf(childId) !== -1) {
+                                    return false;
+                                }
+                            }
+                            content.elements[i].next = [childId];
+
+                            return true;
+                        }
+                    }
+                };
+
+                var applyDefault = function (value, key) {
+
+                    if (!value.id) {
+                        value.id = ++maxElemId;
+                    }
+                    if (!value.type) {
+                        value.type = 'messsage';
+                    }
+
+
+                    value.visParams = value.visParams || {};
+
+                    if (!value.visParams.top) {
+                        value.visParams.top = '20px';
+                    }
+                    if (!value.visParams.left) {
+                        value.visParams.left = (key * 150) + 'px';
+                    }
+                    /*  if (!value.visParams.width) {
+						  value.visParams.width = '150px';
+					  }
+					  if (!value.visParams.height) {
+						  value.visParams.height = '150px';
+					  }*/
+                    return value;
+                };
+
+
+                //set default data if not exists
+                $.each(content.elements, function (key, value) {
+                    content.elements[key] = applyDefault(value, key);
+                });
+
+
+                var drowLine = function (id1, id2) {
+
+                    var id = lineMaxId++;
+                    var box1 = $('#draggable_' + id1);
+                    var box2 = $('#draggable_' + id2);
+
+                    if (!box1.offset() || !box2.offset()) {
+                        return;
+                    }
+
+                    var shift = 25;
+
+
+                    var lineContainer = Drover(area, 'line_' + id);
+
+
+                    var drow = function (box1, box2, self) {
+
+                        var elem1 = box1.find('.right_t_e');
+                        var elem2 = box2.find('.left_t_e');
+
+                        // console.log(elem1.offset(), elem2.offset());
+
+                        if (!elem1.offset() || !elem2.offset()) {
+                            return false;
+                        }
+
+
+                        lineContainer.reset(elem1.offset().left + elem1.outerWidth(true), elem1.offset().top + elem1.height() / 2);
+
+                        lineContainer.shift(shift, 0);
+                        if (self) {
+                            lineContainer
+                                .to(undefined, elem1.offset().top - shift)
+                                .to(elem2.offset().left - shift, undefined)
+                                .to(undefined, elem1.offset().top + elem1.height() / 2)
+
+                        } else {
+                            lineContainer
+                                .to(elem2.offset().left - shift, elem2.offset().top + elem2.height() / 2)
+                        }
+
+                        lineContainer.shift(shift, 0);
+
+
+                    };
+
+
+                    drow(box1, box2, id1 === id2);
+
+                    return {
+                        id: id,
+                        box1: box1,
+                        box2: box2,
+                        //line: d,
+                        reDraw: function () {
+                            drow(box1, box2, id1 === id2);
+                        },
+                        remove: function () {
+                            lineContainer.reset();
+                        }
+
+                    };
+
+                };
+
+
+                var createLine = function (id1, id2) {
+                    lines.push(drowLine(id1, id2));
+                };
+
+
+                var clicked = null;
+
+
+                var mouseLine = (function () {
+                    var shift = 25;
+
+                    var lineContainer = Drover(area, 'line_' + 'mouse');
+
+
+                    // var lineContainer;
+
+                    var drow = function (elem, coords, side) {
+
+
+                        if (side === 'left') {
+                            elem = elem.find('.left_t_e');
+
+                            lineContainer.reset(elem.offset().left, elem.offset().top + elem.height() / 2);
+                            lineContainer.shift(undefined, -shift);
+
+                        } else {
+                            elem = elem.find('.right_t_e');
+                            lineContainer.reset(elem.offset().left + elem.outerWidth(true), elem.offset().top + elem.height() / 2);
+                            lineContainer.shift(undefined, shift);
+                        }
+
+                        lineContainer.to(coords.x, coords.y - 5);
+                    };
+
+
+                    return {
+                        reDraw: function (elem, mouseXY, side) {
+                            drow(elem, mouseXY, side);
+                        },
+                        removeLine: function () {
+                            if (lineContainer)
+                                lineContainer.reset();
+                        }
+
+                    };
+                })();
+
+                area.mousemove(function (event) {
+                    if (clicked) {
+                        mouseLine.reDraw($("#draggable_" + clicked.id), {x: event.pageX, y: event.pageY}, clicked.side);
+                        return true;
+                    } else {
+                        mouseLine.removeLine();
+                    }
+
+                });
+
+                var renderItem = function (value) {
+                    var elem = $("<div id=\"draggable_" + value.id + "\" class=\"ui-widget-content drag_elem\"> <table class='drag_table' style=\"border: solid black 1px; width: 100%; height: 100%\" cellspacing=\"0\" cellpadding=\"0\">\n" +
+                        "        <tr>\n" +
+                        "            <td style=\"border: solid black 1px;width: 10px \"><button class='left_t_e'>&gt;</button></td>\n" +
+                        "            <td style=\"border: solid black 1px;\">type:" + value.type + "<br>id:" + value.id + " <br> " + value.text + "</td>\n" +
+                        "            <td style=\"border: solid black 1px;width: 10px\"><button class='right_t_e'>&gt;</button></td>\n" +
+                        "        </tr>\n" +
+                        "    </table></div>").appendTo(area);
+
+                    elem.css(value.visParams);
+                    elem.resizable({
+                        resize: function () {
+                            storage.reDrawAllLines();
+                        }
+                    });
+
+                    elem.draggable({
+                        scroll: true,
+                        containment: "#edit_area",
+                        cursor: "move",
+                        cancel: ".drag_table",
+                        drag: function (event, ui) {
+                            // console.log(event, ui);
+                            storage.reDrawAllLines();
+                        }
+                    });
+
+
+                    // elem.find('.drag_table').off("mousemove");
+
+
+                    elem.find('.right_t_e').click(function () {
+
+                        var side = 'right';
+                        console.log(side);
+                        if (clicked) {
+                            if (clicked.side === side && clicked.id === value.id) {
+                                clicked = null;
+                                setPointer('default');
+                                return false;
+                            } else if (clicked.side === side) {
+                                alert('Cannot contact ' + side + ' to ' + side);
+                                return false;
+                            }
+                            var res;
+                            if (side === 'left') {
+                                res = addElemChild(clicked.id, value.id);
+                            } else {
+                                res = addElemChild(value.id, clicked.id);
+                            }
+                            if (res) {
+                                createLine(clicked.id, value.id);
+                                clicked = null;
+                                setPointer('default');
+                                mouseLine.removeLine();
+                            } else {
+                                alert('Line alredy exists!');
+                            }
+                        } else {
+                            setPointer('crosshair');
+                            clicked = {side: side, id: value.id};
+                        }
+                        return false;
+
+                    });
+
+                    elem.find('.left_t_e').click(function () {
+                        var side = 'left';
+                        console.log(side);
+                        if (clicked) {
+                            if (clicked.side === side && clicked.id === value.id) {
+                                clicked = null;
+                                setPointer('default');
+                                return false;
+                            } else if (clicked.side === side) {
+                                alert('Cannot contact ' + side + ' to ' + side);
+                                return false;
+                            }
+
+                            if (side === 'left') {
+                                res = addElemChild(clicked.id, value.id);
+                            } else {
+                                res = addElemChild(value.id, clicked.id);
+                            }
+                            if (res) {
+                                createLine(clicked.id, value.id);
+
+                                clicked = null;
+                                setPointer('default');
+                                mouseLine.removeLine();
+                            } else {
+                                alert('Line alredy exists!');
+                            }
+
+
+                        } else {
+                            setPointer('crosshair');
+                            clicked = {side: side, id: value.id};
+                        }
+                        return false;
+                    });
+                    elem.resize();
+
+
+                };
+
+
+                var reDrawAllLines = function () {
+                    $.each(lines, function (key, line) {
+                        line.reDraw();
+                    });
+                };
+
+
+                $.each(content.elements, function (key, value) {
+                    renderItem(value);
+                });
+
+                $.each(content.elements, function (key, value) {
+                    if (!value.next) {
+                        return;
+                    }
+                    if (!Array.isArray(value.next)) {
+                        value.next = [value.next]
+                    }
+
+                    $.each(value.next, function (key, value2) {
+                        createLine(value.id, value2);
+                    });
+
+                });
+
+
+                return {
+                    elements: content,
+                    getById: getById,
+
+                    updateById: updateById,
+                    addElemChild: addElemChild,
+
+                    getAll: function () {
+                        return content.elements
+                    },
+                    createLine: createLine,
+
+                    addElement: function (data) {
+                        data = data || {};
+                        data = applyDefault(data, 0);
+                        content.elements.push(data);
+                        renderItem(data);
+                    },
+                    reDrawAllLines: reDrawAllLines,
+                    removeLine(id) {
+                        $.each(lines, function (key, line) {
+                            if (line.id === id) {
+                                lines.splice(key, 1);
+                            }
+                        });
+                    }
+
+                }
+            };
+
+
+            var storage = StorageHolder(area, json);
+
+
+            newButton.click(function () {
+                storage.addElement();
+            });
+
+
+        });
+    </script>
+</head>
+<body>
+<button id="add_element">Добавить элемент</button>
+<button id="save_elements">Сохранить</button>
+<div id="edit_area" style="min-width: 500px; min-height: 1000px;margin-top: 20px"></div>
+
+</body>
+</html>
